@@ -7,7 +7,7 @@ README = (HERE / "README.md").read_text()
 
 setup(
     name="toarray",
-    version="0.2.0",
+    version="0.2.1",
     description="Small Python package for converting iterables to arrays.",
     long_description=README,
     long_description_content_type="text/markdown",
@@ -23,5 +23,5 @@ setup(
     packages=find_packages(),
     include_package_data=True,
     python_requires='>=3.6',
-    install_requires=[]
+    install_requires=['more_itertools']
 )
