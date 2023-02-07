@@ -1,6 +1,6 @@
 from array import array
 from numbers import Number
-from typing import Iterable
+from typing import Iterable, Union
 
 from more_itertools import minmax
 
@@ -30,10 +30,11 @@ def is_string_array(iterable: Iterable):
     return is_array_type(iterable, 'u')
 
 
-def get_array(iterable: Iterable):
+def get_array(iterable: Iterable) -> Union[array, list]:
     """find C array type and return array
        If no C type is found, return list
     """
+    iterable = list(iterable)
     if len(iterable) == 0:
         print('empty iterable')
         return []
