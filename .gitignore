@@ -9,3 +9,15 @@ build/
 .ipynb_checkpoints/
 __pycache__/
 tests/__pycache__/
+.venv*/
+.ruff_cache/
+.pytest_cache/
+.mypy_cache/
+.tox/
+.coverage
+.coverage.*
+.coverage.*.*
+.coverage.*.*.*
+.coverage.*.*.*.*
+.coverage.*.*.*.*.*
+.coverage.*.*.*.*.*.*
