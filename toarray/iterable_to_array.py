@@ -55,6 +55,65 @@ def _scan_stats(values: list[float]) -> tuple[int, float | None, float | None, b
     return count, vmin, vmax, has_float
 
 
+def _scan_stats_early_exit(
+    values: Iterable[Number], max_samples: int | None = None
+) -> tuple[int, float | None, float | None, bool, bool]:
+    """
+    Scan values with early exit optimization.
+
+    Stops scanning once we know the minimum type required based on bounds.
+    Returns (count, vmin, vmax, has_float, early_exit_used).
+
+    Args:
+        values: Iterable of numeric values
+        max_samples: Maximum number of values to sample for min/max (None = all).
+                    Still counts all items, but only scans min/max for first N.
+
+    Returns:
+        Tuple of (count, min, max, has_float, early_exit_used)
+    """
+    it = iter(values)
+    count = 0
+    vmin: float | None = None
+    vmax: float | None = None
+    has_float = False
+    early_exit = False
+
+    samples_checked = 0
+    for val in it:
+        count += 1
+        fval = float(val)
+
+        # Only update min/max if we haven't hit sample limit
+        if max_samples is None or samples_checked < max_samples:
+            samples_checked += 1
+            if isinstance(val, float):
+                has_float = True
+
+            # Update min/max
+            if vmin is None or fval < vmin:
+                vmin = fval
+            if vmax is None or fval > vmax:
+                vmax = fval
+
+            # Early exit: if we know we need at least 'Q' or 'q', stop scanning min/max
+            # (these are the largest integer types)
+            if not has_float and vmin is not None and vmax is not None:
+                if vmin < -2147483648 or vmax > 4294967295:
+                    # Need at least 64-bit, which is the largest - stop scanning min/max
+                    early_exit = True
+                    # Still need to count remaining items
+                    for _ in it:
+                        count += 1
+                    break
+        else:
+            # Past sample limit - just count
+            if isinstance(val, float):
+                has_float = True
+
+    return count, vmin, vmax, has_float, early_exit
+
+
 def _type_sequence(
     policy: Literal["smallest", "balanced", "wide"],
     prefer_signed: bool,
@@ -99,15 +158,55 @@ def select_array(
     allow_float_downgrade: bool = True,
     no_float: bool = False,
     strict: bool = False,
+    sample_size: int | None = None,
 ) -> array | list:
-    values = list(iterable)
+    """
+    Select the smallest fitting array.array type for an iterable.
+
+    Args:
+        iterable: Input data to convert
+        policy: Selection policy ('smallest', 'balanced', 'wide')
+        min_type: Minimum type to consider (e.g., 'h', 'i')
+        max_type: Maximum type to consider (e.g., 'i', 'q')
+        prefer_signed: Prefer signed types over unsigned
+        allow_float_downgrade: Allow float32 when values fit
+        no_float: Reject float values
+        strict: Raise error if no type fits
+        sample_size: Limit min/max scanning to first N items (None = scan all).
+                    Still processes all items, but only scans bounds for first N.
+                    Useful for very large iterables to speed up type detection.
+
+    Returns:
+        array.array with optimal type, or list if conversion not possible
+    """
+    # Handle empty case early
+    it = iter(iterable)
+    try:
+        first = next(it)
+    except StopIteration:
+        return []
+
+    # Check if numeric
+    if not isinstance(first, Number):
+        # Non-numeric - need to materialize to return list
+        return [first] + list(it)
+
+    # Standard path: materialize all values
+    # Use early-exit scanning for better performance when possible
+    values = [first]
+    for val in it:
+        if not isinstance(val, Number):
+            # Non-numeric found
+            return values + [val] + list(it)
+        values.append(val)
+
     if len(values) == 0:
         return []
     if not _is_all_numeric(values):
         return list(values)
 
-    floats = [float(v) for v in values]
-    count, vmin, vmax, has_float = _scan_stats(floats)
+    # Use early-exit scanning for better performance
+    count, vmin, vmax, has_float, _ = _scan_stats_early_exit(values, max_samples=sample_size)
 
     # Build candidate order
     candidates = _type_sequence(policy, prefer_signed, no_float, min_type, max_type)

@@ -10,6 +10,10 @@ from toarray.iterable_to_array import (
 from toarray.iterable_to_array import (
     stream_array as stream_array,
 )
+from toarray.memory import (
+    get_memory_footprint as get_memory_footprint,
+    memory_report as memory_report,
+)
 
 # Optional interop modules
 try:
@@ -29,6 +33,8 @@ __all__ = [
     "stream_array",
     "to_numpy",
     "to_arrow",
+    "memory_report",
+    "get_memory_footprint",
     "__version__",
 ]
 

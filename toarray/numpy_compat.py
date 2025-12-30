@@ -21,15 +21,42 @@ def to_numpy(
     copy: bool = False,
     **policy,
 ):
+    """
+    Convert an iterable to a NumPy array with automatic dtype selection.
+
+    When dtype='min', this function:
+    1. Automatically selects the smallest fitting array.array type
+    2. Creates a zero-copy NumPy array view using np.frombuffer()
+    3. Falls back to object array for non-numeric data
+
+    Zero-copy conversion is achieved for numeric data by using the underlying
+    array.array buffer directly, avoiding memory duplication.
+
+    Args:
+        iterable: Input data to convert
+        dtype: Target dtype. 'min' selects smallest fitting type automatically.
+               Other options force explicit conversion (may copy).
+        copy: Currently unused, reserved for future use
+        **policy: Selection policy options (see select_array)
+
+    Returns:
+        NumPy array with optimal dtype (zero-copy when dtype='min' and numeric)
+
+    Example:
+        >>> arr = to_numpy([0, 1, 255], dtype='min')
+        >>> arr.dtype  # uint8 (zero-copy from array.array('B'))
+        >>> arr.flags.owndata  # False (shares memory with array.array)
+    """
     if np is None:  # pragma: no cover - import-guarded path
         raise RuntimeError("NumPy not available. Install with `pip install toarray[numpy]`.")
 
     if dtype == "min":
         out = select_array(iterable, **policy)
         if isinstance(out, array):
-            # Zero-copy for numeric arrays
+            # Zero-copy conversion: NumPy views the array.array buffer directly
+            # This avoids memory duplication and is the key efficiency feature
             return np.frombuffer(out, dtype=_typecode_to_numpy_dtype(out.typecode))
-        # Fallback to object array
+        # Fallback to object array (requires copy)
         return np.array(list(out), dtype=object)
 
     # Explicit dtype path
